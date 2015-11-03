@@ -26,10 +26,15 @@ import android.widget.TextView;
 import io.fabric.sdk.android.services.common.CommonUtils;
 
 class PinCodeActivityDelegate extends DigitsActivityDelegateImpl {
+    private final DigitsScribeService scribeService;
     EditText editText;
     StateButton stateButton;
     TextView termsText;
     DigitsController controller;
+
+    PinCodeActivityDelegate(DigitsScribeService scribeService) {
+        this.scribeService = scribeService;
+    }
 
     @Override
     public int getLayoutId() {
@@ -51,12 +56,12 @@ class PinCodeActivityDelegate extends DigitsActivityDelegateImpl {
         CommonUtils.openKeyboard(activity, editText);
     }
 
-    DigitsController initController(Bundle bundle) {
-        return new PinCodeController(bundle
-                .<ResultReceiver>getParcelable(DigitsClient.EXTRA_RESULT_RECEIVER),
-                stateButton, editText, bundle.getString(DigitsClient.EXTRA_REQUEST_ID),
-                bundle.getLong(DigitsClient.EXTRA_USER_ID), bundle.getString(DigitsClient
-                .EXTRA_PHONE));
+        DigitsController initController(Bundle bundle) {
+            return new PinCodeController(bundle
+                    .<ResultReceiver>getParcelable(DigitsClient.EXTRA_RESULT_RECEIVER),
+                    stateButton, editText, bundle.getString(DigitsClient.EXTRA_REQUEST_ID),
+                    bundle.getLong(DigitsClient.EXTRA_USER_ID), bundle.getString(DigitsClient
+                    .EXTRA_PHONE), scribeService, bundle.getBoolean(DigitsClient.EXTRA_EMAIL));
     }
 
     @Override
@@ -68,6 +73,7 @@ class PinCodeActivityDelegate extends DigitsActivityDelegateImpl {
 
     @Override
     public void onResume() {
+        scribeService.impression();
         controller.onResume();
     }
 }

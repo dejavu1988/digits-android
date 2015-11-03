@@ -23,7 +23,7 @@ android {
     defaultConfig {
         versionCode 1
         versionName version
-        minSdkVersion 8
+        minSdkVersion 9
         consumerProguardFiles 'proguard.txt'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
@@ -61,8 +61,13 @@ android {
         test.java.srcDirs += "src/debug"
     }
 
-    testOptions {
-        unitTests.returnDefaultValues = true
+    testOptions.unitTests {
+        returnDefaultValues = true
+        all {
+            testLogging {
+                events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+            }
+        }
     }
 }
 

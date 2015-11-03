@@ -25,7 +25,7 @@ class CouldNotAuthenticateException extends DigitsException {
         super(message);
     }
 
-    public CouldNotAuthenticateException(String message, int errorCode) {
-        super(message, errorCode);
+    public CouldNotAuthenticateException(String message, int error, AuthConfig config) {
+        super(message, error, config);
     }
 }

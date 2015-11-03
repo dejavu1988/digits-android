@@ -29,15 +29,21 @@ class LoginResultReceiver extends ResultReceiver {
     static final int RESULT_ERROR = 400;
     static final String KEY_ERROR = "login_error";
 
-    final AuthCallback callback;
+    final WeakAuthCallback callback;
     final SessionManager<DigitsSession> sessionManager;
 
-    LoginResultReceiver(AuthCallback callback,
-                        SessionManager<DigitsSession> sessionManager) {
+    LoginResultReceiver(AuthCallback callback, SessionManager<DigitsSession> sessionManager) {
+        super(null);
+        this.callback = new WeakAuthCallback(callback);
+        this.sessionManager = sessionManager;
+    }
+    //Test only
+    LoginResultReceiver(WeakAuthCallback callback, SessionManager<DigitsSession> sessionManager) {
         super(null);
         this.callback = callback;
         this.sessionManager = sessionManager;
     }
+
 
     @Override
     public void onReceiveResult(int resultCode, Bundle resultData) {

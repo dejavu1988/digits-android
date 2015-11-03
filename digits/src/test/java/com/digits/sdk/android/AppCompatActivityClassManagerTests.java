@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(RobolectricGradleTestRunner.class)
-@Config(constants = BuildConfig.class, emulateSdk = 21)
+@Config(constants = BuildConfig.class, sdk = 21)
 public class AppCompatActivityClassManagerTests  {
     private AppCompatClassManagerImp activityClassManager;
 
@@ -68,5 +68,11 @@ public class AppCompatActivityClassManagerTests  {
     public void testPinCodeActivity() throws Exception {
         assertEquals(PinCodeActionBarActivity.class,
                 activityClassManager.getPinCodeActivity());
+    }
+
+    @Test
+    public void testEmailRequestActivity() throws Exception {
+        assertEquals(EmailRequestActionBarActivity.class,
+                activityClassManager.getEmailRequestActivity());
     }
 }

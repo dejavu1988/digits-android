@@ -20,21 +20,23 @@ package com.digits.sdk.android;
 import android.annotation.TargetApi;
 import android.os.Build;
 
-import io.fabric.sdk.android.Fabric;
-import io.fabric.sdk.android.Kit;
-import io.fabric.sdk.android.services.concurrency.DependsOn;
-import io.fabric.sdk.android.services.persistence.PreferenceStoreImpl;
-
 import com.twitter.sdk.android.core.PersistedSessionManager;
 import com.twitter.sdk.android.core.Session;
 import com.twitter.sdk.android.core.SessionManager;
+import com.twitter.sdk.android.core.TwitterAuthConfig;
 import com.twitter.sdk.android.core.TwitterCore;
+import com.twitter.sdk.android.core.internal.MigrationHelper;
 import com.twitter.sdk.android.core.internal.SessionMonitor;
 import com.twitter.sdk.android.core.internal.scribe.DefaultScribeClient;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+
+import io.fabric.sdk.android.Fabric;
+import io.fabric.sdk.android.Kit;
+import io.fabric.sdk.android.services.concurrency.DependsOn;
+import io.fabric.sdk.android.services.persistence.PreferenceStoreImpl;
 
 /**
  * Digits allows authentication based on a phone number.
@@ -45,16 +47,17 @@ public class Digits extends Kit<Void> {
 
     static final String PREF_KEY_ACTIVE_SESSION = "active_session";
     static final String PREF_KEY_SESSION = "session";
+    static final String SESSION_PREF_FILE_NAME = "session_store";
 
     private static final String KIT_SCRIBE_NAME = "Digits";
 
     private volatile DigitsClient digitsClient;
     private volatile ContactsClient contactsClient;
     private SessionManager<DigitsSession> sessionManager;
-    private SessionMonitor<DigitsSession> sessionMonitor;
+    private SessionMonitor<DigitsSession> userSessionMonitor;
     private ActivityClassManager activityClassManager;
-    private DigitsScribeService scribeService;
-
+    private DigitsScribeClient scribeClient;
+    private DigitsSessionVerifier digitsSessionVerifier;
 
     private int themeResId;
 
@@ -65,9 +68,12 @@ public class Digits extends Kit<Void> {
     /**
      * Starts the authentication flow
      *
-     * @param callback will get the success or failure callback. It can be null,
-     * but the developer will not get any callback.
+     * @param callback {@link AuthCallback} to be called with the authentication result, or <code>null</code> if no callback is needed.
+     *                 Digits holds a weak reference to this object, therefore the caller should
+     *                 <strong>have a strong reference to this object</strong> or it will never receive
+     *                 the result.
      */
+    @SuppressWarnings("UnusedDeclaration")
     public static void authenticate(AuthCallback callback) {
         authenticate(callback, ThemeUtils.DEFAULT_THEME);
     }
@@ -75,21 +81,25 @@ public class Digits extends Kit<Void> {
     /**
      * Starts the authentication flow with the provided phone number.
      *
-     * @param callback will get the success or failure callback. It can be null,
-     * but the developer will not get any callback.
+     * @param callback    {@link AuthCallback} to be called with the authentication result, or <code>null</code> if no callback is needed.
+     *                    Digits holds a weak reference to this object, therefore the caller should
+     *                    <strong>have a strong reference to this object</strong> or it will never receive
+     *                    the result.
      * @param phoneNumber the phone number to authenticate
      */
+    @SuppressWarnings("UnusedDeclaration")
     public static void authenticate(AuthCallback callback, String phoneNumber) {
-        authenticate(callback, ThemeUtils.DEFAULT_THEME, phoneNumber);
+        authenticate(callback, ThemeUtils.DEFAULT_THEME, phoneNumber, false);
     }
 
     /**
      * Starts and sets the theme for the authentication flow.
      *
-     * @param callback will get the success or failure callback. It can be null,
-     * but the developer will not get any callback.
+     * @param callback   will get the success or failure callback. It can be null,
+     *                   but the developer will not get any callback.
      * @param themeResId Theme resource id
      */
+    @SuppressWarnings("UnusedDeclaration")
     public static void authenticate(AuthCallback callback, int themeResId) {
         getInstance().setTheme(themeResId);
         getInstance().getDigitsClient().startSignUp(callback);
@@ -98,23 +108,53 @@ public class Digits extends Kit<Void> {
     /**
      * Starts the authentication flow with the provided phone number and theme.
      *
-     * @param callback will get the success or failure callback. It can be null,
-     * but the developer will not get any callback.
-     * @param themeResId Theme resource id
+     * @param callback    will get the success or failure callback. It can be null,
+     *                    but the developer will not get any callback.
+     * @param themeResId  Theme resource id
      * @param phoneNumber the phone number to authenticate
      */
-    public static void authenticate(AuthCallback callback, int themeResId, String phoneNumber) {
+    @SuppressWarnings("UnusedDeclaration")
+    public static void authenticate(AuthCallback callback, int themeResId, String phoneNumber,
+                                    boolean emailCollection) {
         getInstance().setTheme(themeResId);
-        getInstance().getDigitsClient().startSignUp(callback, phoneNumber);
+        getInstance().getDigitsClient().startSignUp(callback, phoneNumber, emailCollection);
     }
 
     public static SessionManager<DigitsSession> getSessionManager() {
         return getInstance().sessionManager;
     }
 
+    /**
+     * Adds a {@link SessionListener} to the list of notifiers when the session changes.
+     * <p/>
+     * Internally a strong reference is held to this sessionListener. In case this
+     * sessionListener is instantiated inside an Activity context, when the Activity is being
+     * destroyed, the sessionListener must be remove from the list {@see removeSessionListener}
+     *
+     * @param sessionListener element to add to the list of notifiers.
+     */
+    public void addSessionListener(SessionListener sessionListener) {
+        if (sessionListener == null) {
+            throw new NullPointerException("sessionListener must not be null");
+        }
+        digitsSessionVerifier.addSessionListener(sessionListener);
+    }
+
+    /**
+     * Removes the {@link SessionListener} from the list of notifiers.
+     *
+     * @param sessionListener element to be removed
+     */
+    public void removeSessionListener(SessionListener sessionListener) {
+        if (sessionListener == null) {
+            throw new NullPointerException("sessionListener must not be null");
+        }
+        digitsSessionVerifier.removeSessionListener(sessionListener);
+    }
+
     public Digits() {
         super();
-        scribeService = new NoOpScribeService();
+        scribeClient = new DigitsScribeClientImpl(null);
     }
 
     @Override
@@ -124,10 +164,13 @@ public class Digits extends Kit<Void> {
 
     @Override
     protected boolean onPreExecute() {
-        sessionManager = new PersistedSessionManager<>(new PreferenceStoreImpl(this),
-                new DigitsSession.Serializer(), PREF_KEY_ACTIVE_SESSION, PREF_KEY_SESSION);
-
-        sessionMonitor = new SessionMonitor<>(sessionManager, getExecutorService());
+        final MigrationHelper migrationHelper = new MigrationHelper();
+        migrationHelper.migrateSessionStore(getContext(), getIdentifier(),
+                getIdentifier() + ":" + SESSION_PREF_FILE_NAME + ".xml");
+        sessionManager = new PersistedSessionManager<>(new PreferenceStoreImpl(getContext(),
+                SESSION_PREF_FILE_NAME), new DigitsSession.Serializer(), PREF_KEY_ACTIVE_SESSION,
+                PREF_KEY_SESSION);
+        digitsSessionVerifier = new DigitsSessionVerifier();
         return super.onPreExecute();
     }
 
@@ -137,11 +180,13 @@ public class Digits extends Kit<Void> {
         sessionManager.getActiveSession();
         createDigitsClient();
         createContactsClient();
-        scribeService = new DigitsScribeServiceImp(setUpScribing());
-        sessionMonitor.triggerVerificationIfNecessary();
+        scribeClient = setUpScribing();
+        userSessionMonitor = new SessionMonitor<>(getSessionManager(), getExecutorService(),
+                digitsSessionVerifier);
+        userSessionMonitor.triggerVerificationIfNecessary();
         // Monitor activity lifecycle after sessions have been restored. Otherwise we would not
         // have any sessions to monitor anyways.
-        sessionMonitor.monitorActivityLifecycle(getFabric().getActivityLifecycleManager());
+        userSessionMonitor.monitorActivityLifecycle(getFabric().getActivityLifecycleManager());
         return null;
     }
 
@@ -171,8 +216,8 @@ public class Digits extends Kit<Void> {
         return digitsClient;
     }
 
-    protected DigitsScribeService getScribeService() {
-        return scribeService;
+    protected DigitsScribeClient getScribeClient() {
+        return scribeClient;
     }
 
     private synchronized void createDigitsClient() {
@@ -198,11 +243,11 @@ public class Digits extends Kit<Void> {
         return getFabric().getExecutorService();
     }
 
-    private DefaultScribeClient setUpScribing() {
+    private DigitsScribeClient setUpScribing() {
         final List<SessionManager<? extends Session>> sessionManagers = new ArrayList<>();
         sessionManagers.add(sessionManager);
-        return new DefaultScribeClient(this, KIT_SCRIBE_NAME,
-                sessionManagers, getIdManager());
+        return new DigitsScribeClientImpl(new DefaultScribeClient(this, KIT_SCRIBE_NAME,
+                sessionManagers, getIdManager()));
     }
 
     protected ActivityClassManager getActivityClassManager() {
@@ -215,5 +260,13 @@ public class Digits extends Kit<Void> {
     protected void createActivityClassManager() {
         final ActivityClassManagerFactory factory = new ActivityClassManagerFactory();
         activityClassManager = factory.createActivityClassManager(getContext(), themeResId);
+    }
+
+    /**
+     * Exposes the AuthConfig used in this instance of Digits kit
+     */
+    @SuppressWarnings("UnusedDeclaration")
+    public TwitterAuthConfig getAuthConfig() {
+        return TwitterCore.getInstance().getAuthConfig();
     }
 }

@@ -17,12 +17,13 @@
 
 package com.digits.sdk.android;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 
-import org.apache.http.HttpStatus;
 import org.mockito.ArgumentCaptor;
 
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 
 import retrofit.client.Header;
@@ -41,15 +42,16 @@ public class ConfirmationCodeControllerTests extends
         super.setUp();
         controller = new ConfirmationCodeController(resultReceiver, sendButton,
                 phoneEditText, PHONE_WITH_COUNTRY_CODE, sessionManager, digitsClient, errors,
-                new ActivityClassManagerImp());
+                new ActivityClassManagerImp(), scribeService, false);
     }
 
-    public void testExecuteRequest_success() throws Exception {
+    public void testExecuteRequest_successAndMailRequestDisabled() throws Exception {
         final DigitsCallback callback = executeRequest();
-        final Response response = new Response(TWITTER_URL, HttpStatus.SC_ACCEPTED, "",
+        final Response response = new Response(TWITTER_URL, HttpURLConnection.HTTP_ACCEPTED, "",
                 new ArrayList<Header>(), null);
         final DigitsUser user = new DigitsUser(USER_ID, "");
         callback.success(user, response);
+        verify(scribeService).success();
         verify(sessionManager).setActiveSession(any(DigitsSession.class));
         verify(sendButton).showFinish();
         final ArgumentCaptor<Runnable> runnableArgumentCaptor = ArgumentCaptor.forClass
@@ -66,10 +68,34 @@ public class ConfirmationCodeControllerTests extends
                 (DigitsClient.EXTRA_PHONE));
     }
 
+    public void testExecuteRequest_successAndMailRequestEnabled() throws Exception {
+        controller = new ConfirmationCodeController(resultReceiver, sendButton,
+                phoneEditText, PHONE_WITH_COUNTRY_CODE, sessionManager, digitsClient, errors,
+                new ActivityClassManagerImp(), scribeService, true);
+
+        final Response response = new Response(TWITTER_URL, HttpURLConnection.HTTP_OK, "",
+                new ArrayList<Header>(), null);
+        final DigitsUser user = new DigitsUser(USER_ID, "");
+
+        final DigitsCallback callback = executeRequest();
+        callback.success(user, response);
+
+        verify(scribeService).success();
+        verify(sessionManager).setActiveSession(any(DigitsSession.class));
+        verify(sendButton).showFinish();
+        verify(context).startActivityForResult(intentCaptor.capture(),
+                eq(DigitsActivity.REQUEST_CODE));
+        final Intent intent = intentCaptor.getValue();
+        assertEquals(resultReceiver,
+                intent.getParcelableExtra(DigitsClient.EXTRA_RESULT_RECEIVER));
+        assertEquals(PHONE_WITH_COUNTRY_CODE, intent.getStringExtra(DigitsClient.EXTRA_PHONE));
+    }
+
     DigitsCallback executeRequest() {
         when(phoneEditText.getText()).thenReturn(Editable.Factory.getInstance().newEditable
                 (CODE));
         controller.executeRequest(context);
+        verify(scribeService).click(DigitsScribeConstants.Element.SUBMIT);
         verify(sendButton).showProgress();
         final ArgumentCaptor<DigitsCallback> argumentCaptor = ArgumentCaptor.forClass
                 (DigitsCallback.class);

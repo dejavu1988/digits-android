@@ -3,6 +3,34 @@
 
 ## Unreleased
 
+## v1.9.0
+* Added Email feature
+* Fixed parsing of confirmation code from SMS.
+* Removed usage of deprecated Apache HTTP Client constants.
+
+## v1.8.0
+* Added dgts__logoDrawable to allow providing a custom logo
+* Added voice call verification to the auth flow
+* Raised Min SDK version from 8 to 9.
+
+## v1.7.2
+
+## v1.7.1
+
+* (IC) Fixed issue that invalidates current session.
+
+## v1.7.0
+
+* (IC) Added SessionListener to receive session changes.
+
+## v1.6.2
+
+* (EF) Use AuthRequestQueue for all API request to ensure we always have a valid guest auth token
+* (EF) Fixed critical issue where Digits sessions are lost when using Proguard.
+
+## v1.6.1
+* (IC) Add weak reference to hold the AuthCallback from the developer in LoginResultReceiver
+
 ## v1.6.0
 * (IC) [Fixed crash on StateButton when multiple clicks] (https://github
 .com/twitter/digits-android/issues/2)

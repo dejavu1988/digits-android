@@ -40,10 +40,13 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @RunWith(RobolectricGradleTestRunner.class)
-@Config(constants = BuildConfig.class, emulateSdk = 21)
+@Config(constants = BuildConfig.class, sdk = 21)
 public class FailureActivityDelegateImplTests {
 
     Activity activity;
@@ -56,19 +59,22 @@ public class FailureActivityDelegateImplTests {
     Bundle bundle;
     DigitsException exception;
     ResultReceiver resultReceiver;
+    private DigitsScribeService scribeService;
 
     @Before
     public void setUp() throws Exception {
         activity = mock(Activity.class);
         controller = mock(FailureController.class);
-        delegate = spy(new FailureActivityDelegateImpl(activity, controller));
+        scribeService = mock(DigitsScribeService.class);
+        delegate = spy(new FailureActivityDelegateImpl(activity, controller, scribeService));
         captorClick = ArgumentCaptor.forClass(View.OnClickListener.class);
         intent = mock(Intent.class);
         button = mock(Button.class);
         textView = mock(TextView.class);
         bundle = new Bundle();
         resultReceiver = new ResultReceiver(null);
-        exception = new DigitsException("", TwitterApiErrorConstants.UNKNOWN_ERROR);
+        exception = new DigitsException("", TwitterApiErrorConstants.UNKNOWN_ERROR,
+                new AuthConfig());
 
         bundle.putParcelable(DigitsClient.EXTRA_RESULT_RECEIVER, resultReceiver);
         bundle.putSerializable(DigitsClient.EXTRA_FALLBACK_REASON, exception);
@@ -85,6 +91,7 @@ public class FailureActivityDelegateImplTests {
 
         verify(delegate).setContentView();
         verify(delegate).setUpViews();
+        verify(scribeService).impression();
     }
 
     @Test
@@ -125,6 +132,7 @@ public class FailureActivityDelegateImplTests {
         final View.OnClickListener listener = captorClick.getValue();
         listener.onClick(null);
 
+        verify(scribeService).click(DigitsScribeConstants.Element.DISMISS);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             verify(activity).finishAffinity();
         } else {
@@ -141,6 +149,8 @@ public class FailureActivityDelegateImplTests {
         verify(button).setOnClickListener(captorClick.capture());
         final View.OnClickListener listener = captorClick.getValue();
         listener.onClick(null);
+
+        verify(scribeService).click(DigitsScribeConstants.Element.RETRY);
         verify(controller).tryAnotherNumber(eq(activity), any(ResultReceiver.class));
         verify(activity).finish();
     }

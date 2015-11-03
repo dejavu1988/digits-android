@@ -28,13 +28,18 @@ import android.widget.TextView;
 import io.fabric.sdk.android.services.common.CommonUtils;
 
 class LoginCodeActivityDelegate extends DigitsActivityDelegateImpl {
+    private final DigitsScribeService scribeService;
     EditText editText;
     StateButton stateButton;
     TextView termsText;
     DigitsController controller;
     SmsBroadcastReceiver receiver;
     Activity activity;
-    boolean tosUpdated;
+    AuthConfig config;
+
+    LoginCodeActivityDelegate(DigitsScribeService scribeService) {
+        this.scribeService = scribeService;
+    }
 
     @Override
     public void init(Activity activity, Bundle bundle) {
@@ -43,7 +48,7 @@ class LoginCodeActivityDelegate extends DigitsActivityDelegateImpl {
         stateButton = (StateButton) activity.findViewById(R.id.dgts__createAccount);
         termsText = (TextView) activity.findViewById(R.id.dgts__termsTextCreateAccount);
         final TextView resendText = (TextView) activity.findViewById(R.id.dgts__resendConfirmation);
-        tosUpdated = bundle.getBoolean(DigitsClient.EXTRA_TOS_UPDATED, false);
+        config = bundle.getParcelable(DigitsClient.EXTRA_AUTH_CONFIG);
 
         controller = initController(bundle);
 
@@ -61,12 +66,12 @@ class LoginCodeActivityDelegate extends DigitsActivityDelegateImpl {
                 .<ResultReceiver>getParcelable(DigitsClient.EXTRA_RESULT_RECEIVER),
                 stateButton, editText, bundle.getString(DigitsClient.EXTRA_REQUEST_ID),
                 bundle.getLong(DigitsClient.EXTRA_USER_ID), bundle.getString(DigitsClient
-                .EXTRA_PHONE));
+                .EXTRA_PHONE), scribeService, bundle.getBoolean(DigitsClient.EXTRA_EMAIL));
     }
 
     @Override
     public void setUpTermsText(Activity activity, DigitsController controller, TextView termsText) {
-        if (tosUpdated) {
+        if (config != null && config.tosUpdate) {
             termsText.setText(getFormattedTerms(activity, R.string.dgts__terms_text_sign_in));
             super.setUpTermsText(activity, controller, termsText);
         } else {
@@ -74,19 +79,12 @@ class LoginCodeActivityDelegate extends DigitsActivityDelegateImpl {
         }
     }
 
-    @Override
-    public void setUpSendButton(Activity activity, DigitsController controller,
-            StateButton stateButton) {
-        stateButton.setStatesText(R.string.dgts__sign_in, R.string.dgts__signing_in,
-                R.string.dgts__sign_in);
-        stateButton.showStart();
-        super.setUpSendButton(activity, controller, stateButton);
-    }
-
     protected void setUpResendText(final Activity activity, TextView resendText) {
         resendText.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                scribeService.click(DigitsScribeConstants.Element.RESEND);
+                activity.setResult(DigitsActivity.RESULT_RESEND_CONFIRMATION);
                 activity.finish();
             }
         });
@@ -106,6 +104,7 @@ class LoginCodeActivityDelegate extends DigitsActivityDelegateImpl {
 
     @Override
     public void onResume() {
+        scribeService.impression();
         controller.onResume();
     }
 

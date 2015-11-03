@@ -17,30 +17,44 @@
 
 package com.digits.sdk.android;
 
+import android.app.Activity;
+
+import java.lang.reflect.Field;
+
 import io.fabric.sdk.android.FabricAndroidTestCase;
 
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class DigitsAndroidTestCase extends FabricAndroidTestCase {
+    static final String ERROR_MESSAGE = "random error";
+    static final DigitsException EXCEPTION = new DigitsException(ERROR_MESSAGE);
+    static final UnrecoverableException UNRECOVERABLE_EXCEPTION =
+            new UnrecoverableException(ERROR_MESSAGE);
+    static final int ANY_REQUEST = 1010;
+    static final int ANY_RESULT = Activity.RESULT_OK;
 
     protected static final String TWITTER_URL = "http://twitter.com";
-    protected static final String CONSUMER_KEY = "testKey";
-    protected static final String CONSUMER_SECRET = "testSecret";
-    protected static final String TOKEN = "token";
-    protected static final String SECRET = "secret";
-    protected static final long USER_ID = 11;
-
-    protected static final String RAW_PHONE = "+123456789";
-    protected static final String PHONE = "123456789";
-    protected static final String PHONE_NO_COUNTRY_CODE = "23456789";
-    protected static final String PHONE_PLUS_SYMBOL_NO_COUNTRY_CODE = "23456789";
     protected static final String US_COUNTRY_CODE = "1";
     protected static final String US_ISO2 = "us";
-    protected static final String US_ISO3 = "usa";
 
     protected void verifyNoInteractions(Object... objects) {
         for (Object object : objects) {
             verifyZeroInteractions(object);
         }
+    }
+
+    /**
+     * Verifies resultCode is set on the activity by using reflection. This is handy since {@link
+     * Activity#setResult(int)} is final method and can't be mock.
+     *
+     * @throws NoSuchFieldException
+     * @throws IllegalAccessException
+     */
+    protected void verifyResultCode(Activity activity, int resultCode) throws NoSuchFieldException,
+            IllegalAccessException {
+        final Field field = Activity.class.getDeclaredField("mResultCode");
+        field.setAccessible(true);
+        final int actualResultCode = (Integer) field.get(activity);
+        assertEquals(resultCode, actualResultCode);
     }
 }

@@ -29,9 +29,8 @@ import com.digits.sdk.android.Digits;
 import com.digits.sdk.android.DigitsAuthButton;
 import com.digits.sdk.android.DigitsException;
 import com.digits.sdk.android.DigitsSession;
-
+import com.digits.sdk.android.SessionListener;
 import com.example.app.R;
-
 import com.twitter.sdk.android.core.Callback;
 import com.twitter.sdk.android.core.Result;
 import com.twitter.sdk.android.core.TwitterAuthToken;
@@ -41,10 +40,10 @@ import com.twitter.sdk.android.core.models.User;
 
 public class DigitsMainActivity extends Activity {
     private AuthCallback callback;
-    private DigitsAuthButton digitsAuthButton;
-    private Button findFriendsButton;
+    private Button digitsAuthButton;
     private Button clearSessionButton;
     private Button verifyCredentialsButton;
+    private SessionListener sessionListener;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -82,10 +81,14 @@ public class DigitsMainActivity extends Activity {
                         Toast.LENGTH_SHORT).show();
             }
         };
-        //Example of how the Digits button works
-        digitsAuthButton = (DigitsAuthButton) findViewById(R.id.signup_button);
-        digitsAuthButton.setCallback(callback);
-        digitsAuthButton.setAuthTheme(R.style.LightTheme);
+
+        digitsAuthButton = (Button) findViewById(R.id.signup_button);
+        digitsAuthButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Digits.authenticate(callback, R.style.LightTheme,"",true);
+            }
+        });
 
         verifyCredentialsButton = (Button) findViewById(R.id.verify_credentials_button);
         verifyCredentialsButton.setOnClickListener(new View.OnClickListener() {
@@ -115,12 +118,27 @@ public class DigitsMainActivity extends Activity {
             }
         });
 
-        findFriendsButton = (Button) findViewById(R.id.find_your_friends_button);
+        Button findFriendsButton = (Button) findViewById(R.id.find_your_friends_button);
         findFriendsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Digits.getInstance().getContactsClient().startContactsUpload();
             }
         });
+
+        sessionListener = new SessionListener() {
+            @Override
+            public void changed(DigitsSession newSession) {
+                Toast.makeText(DigitsMainActivity.this, "Session phone was changed: " + newSession
+                        .getPhoneNumber(), Toast.LENGTH_SHORT).show();
+            }
+        };
+        Digits.getInstance().addSessionListener(sessionListener);
+    }
+
+    @Override
+    protected void onStop() {
+        Digits.getInstance().removeSessionListener(sessionListener);
+        super.onStop();
     }
 }

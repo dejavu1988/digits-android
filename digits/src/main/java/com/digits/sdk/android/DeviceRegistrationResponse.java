@@ -26,5 +26,6 @@ public class DeviceRegistrationResponse {
     public String normalizedPhoneNumber;
     @SerializedName("state")
     public String state;
-
+    @SerializedName("config")
+    public AuthConfig authConfig;
 }

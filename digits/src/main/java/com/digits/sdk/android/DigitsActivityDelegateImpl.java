@@ -20,6 +20,8 @@ package com.digits.sdk.android;
 
 import android.app.Activity;
 import android.support.annotation.StringRes;
+import android.text.Html;
+import android.text.Spanned;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -72,7 +74,12 @@ abstract class DigitsActivityDelegateImpl implements DigitsActivityDelegate {
         });
     }
 
-    protected String getFormattedTerms(Activity activity, @StringRes int termsResId) {
-        return activity.getString(termsResId, "\"");
+    protected Spanned getFormattedTerms(Activity activity, @StringRes int termsResId) {
+        return Html.fromHtml(activity.getString(termsResId, "\"", "<u>", "</u>"));
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Activity activity) {
+        // no-op Not used by all the delegates
     }
 }

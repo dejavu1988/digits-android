@@ -22,6 +22,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.ResultReceiver;
+import android.text.SpannedString;
 import android.view.View;
 
 import static org.mockito.Matchers.any;
@@ -35,10 +36,9 @@ import static org.mockito.Mockito.when;
 
 public class LoginCodeActivityDelegateTests extends
         DigitsActivityDelegateTests<LoginCodeActivityDelegate> {
-
     @Override
     public LoginCodeActivityDelegate getDelegate() {
-        return spy(new DummyLoginCodeActivityDelegate());
+        return spy(new DummyLoginCodeActivityDelegate(scribeService));
     }
 
     public void testIsValid() {
@@ -93,43 +93,41 @@ public class LoginCodeActivityDelegateTests extends
 
     @Override
     public void testSetUpTermsText() throws Exception {
-        delegate.tosUpdated = false;
+        delegate.config = new AuthConfig();
+        delegate.config.tosUpdate = Boolean.FALSE;
         delegate.setUpTermsText(activity, controller, textView);
 
         verify(textView).setVisibility(View.GONE);
     }
 
     public void testSetUpTermsText_tosUpdated() throws Exception {
-        doReturn("").when(delegate).getFormattedTerms(any(Activity.class), anyInt());
-        delegate.tosUpdated = true;
+        doReturn(new SpannedString("")).when(delegate).getFormattedTerms(any(Activity.class),
+                anyInt());
+        delegate.config = new AuthConfig();
+        delegate.config.tosUpdate = Boolean.TRUE;
         delegate.setUpTermsText(activity, controller, textView);
 
         verify(delegate).getFormattedTerms(any(Activity.class),
                 eq(R.string.dgts__terms_text_sign_in));
     }
 
-    @Override
-    public void testSetUpSendButton() throws Exception {
-        super.testSetUpSendButton();
-        verify(button).setStatesText(R.string.dgts__sign_in, R.string.dgts__signing_in,
-                R.string.dgts__sign_in);
-        verify(button).showStart();
-    }
-
-    public void testSetUpResendText() {
+    public void testSetUpResendText() throws NoSuchFieldException, IllegalAccessException {
         delegate.controller = controller;
         delegate.setUpResendText(activity, editText);
 
         verify(editText).setOnClickListener(captorClick.capture());
         final View.OnClickListener listener = captorClick.getValue();
         listener.onClick(null);
+        verify(scribeService).click(DigitsScribeConstants.Element.RESEND);
         verify(activity).finish();
+        verifyResultCode(activity, DigitsActivity.RESULT_RESEND_CONFIRMATION);
     }
 
     public void testOnResume() {
         delegate.controller = controller;
         delegate.onResume();
         verify(controller).onResume();
+        verify(scribeService).impression();
     }
 
     public void testSetUpSmsIntercept_permissionDenied() {
@@ -154,5 +152,8 @@ public class LoginCodeActivityDelegateTests extends
 
     public class DummyLoginCodeActivityDelegate extends LoginCodeActivityDelegate {
 
+        DummyLoginCodeActivityDelegate(DigitsScribeService scribeService) {
+            super(scribeService);
+        }
     }
 }

@@ -28,9 +28,9 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.widget.EditText;
 
-import io.fabric.sdk.android.services.common.CommonUtils;
-
 import com.twitter.sdk.android.core.SessionManager;
+
+import io.fabric.sdk.android.services.common.CommonUtils;
 
 abstract class DigitsControllerImpl implements DigitsController, TextWatcher {
     public static final int MAX_ERRORS = 5;
@@ -42,13 +42,15 @@ abstract class DigitsControllerImpl implements DigitsController, TextWatcher {
     final EditText editText;
     final StateButton sendButton;
     final SessionManager<DigitsSession> sessionManager;
-    private int errorCount;
+    final DigitsScribeService scribeService;
+    int errorCount;
 
 
     DigitsControllerImpl(ResultReceiver resultReceiver, StateButton stateButton, EditText editText,
                          DigitsClient client, ErrorCodes errors,
-                         ActivityClassManager activityClassManager, SessionManager<DigitsSession>
-            sessionManager) {
+                         ActivityClassManager activityClassManager,
+                         SessionManager<DigitsSession> sessionManager,
+                         DigitsScribeService scribeService) {
         this.resultReceiver = resultReceiver;
         this.digitsClient = client;
         this.activityClassManager = activityClassManager;
@@ -57,6 +59,7 @@ abstract class DigitsControllerImpl implements DigitsController, TextWatcher {
         this.errors = errors;
         this.sessionManager = sessionManager;
         this.errorCount = 0;
+        this.scribeService = scribeService;
     }
 
     @Override
@@ -69,7 +72,9 @@ abstract class DigitsControllerImpl implements DigitsController, TextWatcher {
     @Override
     public void handleError(Context context, DigitsException exception) {
         errorCount++;
+        scribeService.error(exception);
         if (isUnrecoverable(exception)) {
+            scribeService.failure();
             startFallback(context, resultReceiver, exception);
         } else {
             editText.setError(exception.getLocalizedMessage());
@@ -160,5 +165,14 @@ abstract class DigitsControllerImpl implements DigitsController, TextWatcher {
                         DigitsActivity.RESULT_FINISH_DIGITS);
             }
         }, POST_DELAY_MS);
+    }
+
+    void startEmailRequest(final Context context, String phoneNumber) {
+        sendButton.showFinish();
+        final Intent intent = new Intent(context, activityClassManager.getEmailRequestActivity());
+        final Bundle bundle = getBundle(phoneNumber);
+        bundle.putParcelable(DigitsClient.EXTRA_RESULT_RECEIVER, resultReceiver);
+        intent.putExtras(bundle);
+        startActivityForResult((Activity) context, intent);
     }
 }

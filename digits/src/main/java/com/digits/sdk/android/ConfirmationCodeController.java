@@ -22,21 +22,23 @@ import android.net.Uri;
 import android.os.ResultReceiver;
 import android.widget.EditText;
 
-import io.fabric.sdk.android.services.common.CommonUtils;
-
 import com.twitter.sdk.android.core.Result;
 import com.twitter.sdk.android.core.SessionManager;
 
+import io.fabric.sdk.android.services.common.CommonUtils;
+
 class ConfirmationCodeController extends DigitsControllerImpl {
     private final String phoneNumber;
-
+    private final Boolean isEmailCollection;
 
     ConfirmationCodeController(ResultReceiver resultReceiver, StateButton stateButton,
-                               EditText phoneEditText, String phoneNumber) {
+                               EditText phoneEditText, String phoneNumber,
+                               DigitsScribeService scribeService, boolean isEmailCollection) {
         this(resultReceiver, stateButton, phoneEditText, phoneNumber,
                 Digits.getSessionManager(), Digits.getInstance().getDigitsClient(),
                 new ConfirmationErrorCodes(stateButton.getContext().getResources()),
-                Digits.getInstance().getActivityClassManager());
+                Digits.getInstance().getActivityClassManager(), scribeService,
+                isEmailCollection);
     }
 
     /**
@@ -45,14 +47,17 @@ class ConfirmationCodeController extends DigitsControllerImpl {
     ConfirmationCodeController(ResultReceiver resultReceiver, StateButton stateButton,
                                EditText phoneEditText, String phoneNumber,
                                SessionManager<DigitsSession> sessionManager, DigitsClient client,
-                               ErrorCodes errors, ActivityClassManager activityClassManager) {
+                               ErrorCodes errors, ActivityClassManager activityClassManager,
+                               DigitsScribeService scribeService, boolean isEmailCollection) {
         super(resultReceiver, stateButton, phoneEditText, client, errors, activityClassManager,
-                sessionManager);
+                sessionManager, scribeService);
         this.phoneNumber = phoneNumber;
+        this.isEmailCollection = isEmailCollection;
     }
 
     @Override
     public void executeRequest(final Context context) {
+        scribeService.click(DigitsScribeConstants.Element.SUBMIT);
         if (validateInput(editText.getText())) {
             sendButton.showProgress();
             CommonUtils.hideKeyboard(context, editText);
@@ -61,8 +66,15 @@ class ConfirmationCodeController extends DigitsControllerImpl {
                     new DigitsCallback<DigitsUser>(context, this) {
                         @Override
                         public void success(Result<DigitsUser> result) {
-                            final DigitsSession session = DigitsSession.create(result);
-                            loginSuccess(context, session, phoneNumber);
+                            scribeService.success();
+                            final DigitsSession session =
+                                    DigitsSession.create(result, phoneNumber);
+                            if (isEmailCollection) {
+                                sessionManager.setActiveSession(session);
+                                startEmailRequest(context, phoneNumber);
+                            } else {
+                                loginSuccess(context, session, phoneNumber);
+                            }
                         }
 
                     });

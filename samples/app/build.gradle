@@ -1,15 +1,3 @@
-buildscript {
-    repositories {
-        mavenCentral()
-        maven { url 'https://maven.fabric.io/public' }
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:1.2.3'
-        classpath 'io.fabric.tools:gradle:1.19.0'
-    }
-}
-
 /*
  * Copyright (C) 2015 Twitter, Inc.
  *
@@ -27,6 +15,19 @@ buildscript {
  *
  */
 
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url 'https://maven.fabric.io/public' }
+    }
+
+    dependencies {
+        classpath 'com.stanfy.spoon:spoon-gradle-plugin:1.0.3'
+        classpath 'com.android.tools.build:gradle:1.3.0'
+        classpath 'io.fabric.tools:gradle:1.19.0'
+    }
+}
+
 //Load API Key information in from property file
 Properties props = new Properties()
 try {
@@ -37,6 +38,7 @@ try {
 
 apply plugin: 'com.android.application'
 apply plugin: 'io.fabric'
+apply plugin: 'spoon'
 
 
 repositories {
@@ -49,11 +51,12 @@ android {
     buildToolsVersion rootProject.buildToolsVersion
 
     defaultConfig {
-        applicationId "com.example.app"
+        applicationId "com.example.app.digits"
         versionCode 1
         versionName "1.0"
         minSdkVersion 9
         targetSdkVersion rootProject.targetSdkVersion
+        testInstrumentationRunner "com.example.app.SpoonInstrumentationTestRunner"
     }
 
     buildTypes {
@@ -69,6 +72,16 @@ android {
         }
     }
 
+    packagingOptions {
+        exclude 'LICENSE.txt'
+    }
+
+    spoon {
+        if (project.hasProperty('spoonClassName')) {
+            className = project.spoonClassName
+        }
+    }
+
     lintOptions {
         warningsAsErrors true
     }
@@ -81,5 +94,12 @@ android {
 
 dependencies {
     compile project(':digits')
-    compile 'com.android.support:appcompat-v7:21.0.3'
+    compile rootProject.appCompat
+
+    debugCompile rootProject.leakCanary
+    releaseCompile rootProject.leakCanaryNoOp
+
+    androidTestCompile rootProject.spoon
+    androidTestCompile rootProject.espresso
+    androidTestCompile rootProject.androidTestingSupport
 }

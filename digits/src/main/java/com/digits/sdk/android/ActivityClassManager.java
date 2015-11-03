@@ -33,4 +33,6 @@ public interface ActivityClassManager {
     Class<? extends Activity> getContactsActivity();
 
     Class<? extends Activity> getPinCodeActivity();
+
+    Class<? extends Activity> getEmailRequestActivity();
 }

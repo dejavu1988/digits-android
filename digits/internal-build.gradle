@@ -18,9 +18,11 @@
 apply plugin: 'android-sdk-manager'
 apply plugin: 'com.android.library'
 apply from: rootProject.qualityScript
-apply from: rootProject.sizeScript
 apply from: rootProject.deployScript
-apply plugin: com.twitter.one.gradle.FabricPropertiesPlugin
+apply plugin: io.fabric.gradle.weaving.ArtifactSizePlugin
+apply plugin: io.fabric.gradle.weaving.FabricPropertiesPlugin
+apply plugin: io.fabric.gradle.release.FabricKitReleasePlugin
+apply plugin: io.fabric.gradle.weaving.DexMethodCountPlugin
 
 android {
     compileSdkVersion rootProject.compileSdkVersion
@@ -28,10 +30,11 @@ android {
     defaultConfig {
         versionCode 1
         versionName version
-        minSdkVersion 8
+        minSdkVersion 9
         consumerProguardFiles 'proguard.txt'
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
+
     buildTypes {
         debug {
             buildConfigField "String", "GROUP", "\"${pom_group_id}\""
@@ -65,11 +68,8 @@ android {
         warningsAsErrors true
     }
 
-    productFlavors {
-    }
-
-    jacoco {
-        version = jacocoVersion
+    dexMethodCount {
+        packageFilter = "com.digits.sdk"
     }
 
     packagingOptions {
@@ -92,20 +92,25 @@ android {
         test.java.srcDirs += "src/debug"
     }
 
-    testOptions {
-        unitTests.returnDefaultValues = true
+    testOptions.unitTests {
+        returnDefaultValues = true
+        all {
+            testLogging {
+                events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+            }
+        }
     }
 }
 
 ext.projectDependencies = [
-        ':sdk:fabric:fabric',
-        ':sdk:twitter:twitter-core'
+        ':sdk:fabric:fabric' : 'io.fabric.sdk.android:fabric:+@aar',
+        ':sdk:twitter:twitter-core' : 'com.twitter.sdk.android:twitter-core:+@aar'
 ]
 
 dependencies {
-    projectDependencies.each {
-        debugCompile project(path: it, configuration: 'debug')
-        releaseCompile kitDependency(path: it, configuration: 'release')
+    projectDependencies.each { path, binary ->
+        debugCompile project(path: path, configuration: 'debug')
+        releaseCompile projectOrBinary(path: path, configuration: 'release', binary: binary)
     }
 
     // We need to include the appcompat as a compile time dependency to workaround a bug that exists
@@ -115,7 +120,8 @@ dependencies {
     androidTestCompile rootProject.mockito
     androidTestCompile rootProject.dexmakerMockito
     androidTestCompile rootProject.androidTestingSupport
-    
+
+    testCompile rootProject.fabricTest
     testCompile rootProject.mavenAntTasks
     testCompile rootProject.mockito
     testCompile rootProject.androidTestingSupport
@@ -129,3 +135,42 @@ dependencies {
     }
 }
 
+fabricKitRelease {
+    apiKey = project.hasProperty('DIGITS_KIT_API_KEY') ? project.DIGITS_KIT_API_KEY : ""
+    friendlyName = "Digits"
+    name = "${project.pom_group_id}.${project.pom_artifact_id}"
+    description = "Add phone number signup and login to your app with just a few lines of code."
+    version = project.version
+    artifactUrl = "https://maven.fabric.io/repo/com/digits/sdk/android/digits/${project.version}/digits-${project.version}.pom"
+    releaseNotesUrl = "https://s3.amazonaws.com/kits-crashlytics-com/android/com/digits/sdk/android/digits/${project.version}/digits-${project.version}-release-notes.html"
+    learnMoreUrl = "http://docs.fabric.io/android/digits/index.html"
+    price {
+        plan = "free"
+    }
+    license {
+        name = "Twitter"
+        url = "https://twitter.com/tos"
+    }
+    releaseChannel = "public"
+    minBuild = 0
+    maxBuild = Integer.MAX_VALUE
+    minPlatformVersion {
+        apiVersion "8"
+    }
+    docsUrl = "https://docs.fabric.io/javadocs/digits/${project.version}/index.html"
+    twitterHandle = "@digits"
+    websiteUrl = "https://get.digits.com/"
+}
+
+project.tasks.getByName('fabricKitRelease').enabled = rootProject.ext.kitsForRelease.get(project.path)
+
+task uploadFabricReleaseNotes(group: 'Release',
+        description: 'Upload Release Notes to S3 bucket kits-crashlytics-com',
+        type: io.fabric.gradle.release.FileUploadS3Task) {
+    enabled = rootProject.ext.kitsForRelease.get(project.path)
+    accessKey = System.properties['AWS_ACCESS_KEY_ID']
+    secretKey = System.properties['AWS_SECRET_ACCESS_KEY']
+    bucketName = System.properties['AWS_BUCKET']
+    destination = "android/com/digits/sdk/android/digits/${project.version}/digits-${project.version}-release-notes.html"
+    srcFile = new File("${project.projectDir}/release-notes.html")
+}

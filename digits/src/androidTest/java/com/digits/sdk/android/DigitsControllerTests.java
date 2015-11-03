@@ -33,13 +33,13 @@ import org.mockito.ArgumentCaptor;
 
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 public abstract class DigitsControllerTests<T extends DigitsControllerImpl> extends
         DigitsAndroidTestCase {
-    static final String ERROR_MESSAGE = "random error";
     static final Integer COUNTRY_CODE = 123;
     static final String PHONE = "123456789";
     static final String PHONE_WITH_COUNTRY_CODE = "+" + COUNTRY_CODE + "123456789";
@@ -60,6 +60,7 @@ public abstract class DigitsControllerTests<T extends DigitsControllerImpl> exte
     ErrorCodes errors;
     SessionManager<DigitsSession> sessionManager;
     Activity context;
+    DigitsScribeService scribeService;
 
     @Override
     public void setUp() throws Exception {
@@ -74,7 +75,9 @@ public abstract class DigitsControllerTests<T extends DigitsControllerImpl> exte
         resultReceiver = mock(ResultReceiver.class);
         sessionManager = mock(SessionManager.class);
         errors = mock(ErrorCodes.class);
+        scribeService = mock(DigitsScribeService.class);
         when(context.getPackageName()).thenReturn(getClass().getPackage().toString());
+        when(context.getResources()).thenReturn(getContext().getResources());
     }
 
     public void testShowTOS() throws Exception {
@@ -86,20 +89,24 @@ public abstract class DigitsControllerTests<T extends DigitsControllerImpl> exte
     }
 
     public void testHandleError() throws Exception {
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
+        controller.handleError(context, EXCEPTION);
+        verify(scribeService).error(EXCEPTION);
         verify(phoneEditText).setError(ERROR_MESSAGE);
         verify(sendButton).showError();
+        verifyNoInteractions(scribeService);
         verifyZeroInteractions(context);
     }
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     public void testShowError_fiveTimesStartFallback() throws Exception {
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
-        controller.handleError(context, new DigitsException(ERROR_MESSAGE));
+        controller.handleError(context, EXCEPTION);
+        controller.handleError(context, EXCEPTION);
+        controller.handleError(context, EXCEPTION);
+        controller.handleError(context, EXCEPTION);
+        controller.handleError(context, EXCEPTION);
 
+        verify(scribeService, times(5)).error(EXCEPTION);
+        verify(scribeService).failure();
         verify(phoneEditText, atMost(4)).setError(ERROR_MESSAGE);
         verify(sendButton, atMost(4)).showError();
         verify(context).startActivity(intentCaptor.capture());
@@ -116,6 +123,11 @@ public abstract class DigitsControllerTests<T extends DigitsControllerImpl> exte
 
     public void testHandleError_unrecoverableExceptionStartFallback() throws Exception {
         controller.handleError(context, new UnrecoverableException(ERROR_MESSAGE));
+        verifyUnrecoverableException();
+    }
+
+    void verifyUnrecoverableException() {
+        verify(scribeService).failure();
         verifyNoInteractions(sendButton, phoneEditText);
         verify(context).startActivity(intentCaptor.capture());
         final Intent intent = intentCaptor.getValue();
@@ -131,7 +143,7 @@ public abstract class DigitsControllerTests<T extends DigitsControllerImpl> exte
 
     public void testStartFallback() throws Exception {
         controller.startFallback(context, resultReceiver, new DigitsException("",
-                TwitterApiErrorConstants.USER_IS_NOT_SDK_USER));
+                TwitterApiErrorConstants.USER_IS_NOT_SDK_USER, new AuthConfig()));
         verify(context).startActivity(intentCaptor.capture());
         final Intent intent = intentCaptor.getValue();
         assertEquals(FailureActivity.class.getName(), intent.getComponent().getClassName());

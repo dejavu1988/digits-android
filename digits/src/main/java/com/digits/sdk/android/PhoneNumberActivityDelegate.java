@@ -28,12 +28,19 @@ import android.widget.TextView;
 import io.fabric.sdk.android.services.common.CommonUtils;
 
 class PhoneNumberActivityDelegate extends DigitsActivityDelegateImpl implements
-        PhoneNumberTask.Listener {
+        PhoneNumberTask.Listener, TosView {
+    private final DigitsScribeService scribeService;
+    private Activity activity;
+
     CountryListSpinner countryCodeSpinner;
     StateButton sendButton;
     EditText phoneEditText;
     TextView termsTextView;
     PhoneNumberController controller;
+
+    public PhoneNumberActivityDelegate(DigitsScribeService scribeService) {
+        this.scribeService = scribeService;
+    }
 
     @Override
     public int getLayoutId() {
@@ -47,12 +54,11 @@ class PhoneNumberActivityDelegate extends DigitsActivityDelegateImpl implements
 
     @Override
     public void init(Activity activity, Bundle bundle) {
-
+        this.activity = activity;
         countryCodeSpinner = (CountryListSpinner) activity.findViewById(R.id.dgts__countryCode);
         sendButton = (StateButton) activity.findViewById(R.id.dgts__sendCodeButton);
         phoneEditText = (EditText) activity.findViewById(R.id.dgts__phoneNumberEditText);
         termsTextView = (TextView) activity.findViewById(R.id.dgts__termsText);
-
         controller = initController(bundle);
 
         setUpEditText(activity, controller, phoneEditText);
@@ -84,7 +90,8 @@ class PhoneNumberActivityDelegate extends DigitsActivityDelegateImpl implements
     PhoneNumberController initController(Bundle bundle) {
         return new PhoneNumberController(bundle
                 .<ResultReceiver>getParcelable(DigitsClient.EXTRA_RESULT_RECEIVER), sendButton,
-                phoneEditText, countryCodeSpinner);
+                phoneEditText, countryCodeSpinner, this, scribeService, bundle.getBoolean
+                (DigitsClient.EXTRA_EMAIL));
     }
 
     @Override
@@ -97,6 +104,7 @@ class PhoneNumberActivityDelegate extends DigitsActivityDelegateImpl implements
         countryCodeSpinner.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                scribeService.click(DigitsScribeConstants.Element.COUNTRY_CODE);
                 controller.clearError();
             }
         });
@@ -104,11 +112,25 @@ class PhoneNumberActivityDelegate extends DigitsActivityDelegateImpl implements
 
     @Override
     public void onResume() {
+        scribeService.impression();
         controller.onResume();
     }
 
     public void onLoadComplete(PhoneNumber phoneNumber) {
         controller.setPhoneNumber(phoneNumber);
         controller.setCountryCode(phoneNumber);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Activity activity) {
+        if (resultCode == DigitsActivity.RESULT_RESEND_CONFIRMATION &&
+                requestCode == DigitsActivity.REQUEST_CODE) {
+            controller.resend();
+        }
+    }
+
+    @Override
+    public void setText(int resourceId) {
+        termsTextView.setText(getFormattedTerms(activity, resourceId));
     }
 }
