@@ -86,7 +86,7 @@ public class DigitsMainActivity extends Activity {
         digitsAuthButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Digits.authenticate(callback, R.style.LightTheme,"",true);
+                Digits.authenticate(callback, R.style.LightTheme,"",false);
             }
         });
 
