@@ -90,24 +90,24 @@ public class DigitsClient {
         return new DigitsAuthRequestQueue(this, sessionProvider);
     }
 
-    protected void startSignUp(AuthCallback callback) {
-        startSignUpWithBundle(callback, createBundleForAuthFlow(callback));
+    protected void startSignUp(Context activity, AuthCallback callback) {
+        startSignUpWithBundle(activity, callback, createBundleForAuthFlow(callback));
     }
 
-    protected void startSignUp(AuthCallback callback, String phoneNumber,
+    protected void startSignUp(Context activity, AuthCallback callback, String phoneNumber,
                                boolean emailCollection) {
-        startSignUpWithBundle(callback, createBundleForAuthFlow(callback,
+        startSignUpWithBundle(activity, callback, createBundleForAuthFlow(callback,
                 phoneNumber == null ? "" : phoneNumber, emailCollection));
     }
 
-    private void startSignUpWithBundle(AuthCallback callback, Bundle bundle) {
+    private void startSignUpWithBundle(Context activity, AuthCallback callback, Bundle bundle) {
         scribeService.impression();
         final DigitsSession session = sessionManager.getActiveSession();
         if (session != null && !session.isLoggedOutUser()) {
             callback.success(session, null);
             scribeService.success();
         } else {
-            startPhoneNumberActivity(twitterCore.getContext(), bundle);
+            startPhoneNumberActivity(activity, twitterCore.getContext(), bundle);
         }
     }
 
@@ -130,13 +130,12 @@ public class DigitsClient {
         return new LoginResultReceiver(callback, sessionManager);
     }
 
-    private void startPhoneNumberActivity(Context context, Bundle bundle) {
-        final Intent intent = new Intent(context, digits.getActivityClassManager()
+    private void startPhoneNumberActivity(Context activity, Context context, Bundle bundle) {
+        final Intent intent = new Intent(activity, digits.getActivityClassManager()
                 .getPhoneNumberActivity());
         intent.putExtras(bundle);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
-         | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS );
-        context.startActivity(intent);
+        //intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS );
+        activity.startActivity(intent);
     }
 
     protected void authDevice(final String phoneNumber, final Verification verificationType,

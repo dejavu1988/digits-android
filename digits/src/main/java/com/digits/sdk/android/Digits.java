@@ -18,6 +18,7 @@
 package com.digits.sdk.android;
 
 import android.annotation.TargetApi;
+import android.content.Context;
 import android.os.Build;
 
 import com.twitter.sdk.android.core.PersistedSessionManager;
@@ -74,8 +75,8 @@ public class Digits extends Kit<Void> {
      *                 the result.
      */
     @SuppressWarnings("UnusedDeclaration")
-    public static void authenticate(AuthCallback callback) {
-        authenticate(callback, ThemeUtils.DEFAULT_THEME);
+    public static void authenticate(Context activity, AuthCallback callback) {
+        authenticate(activity, callback, ThemeUtils.DEFAULT_THEME);
     }
 
     /**
@@ -88,8 +89,8 @@ public class Digits extends Kit<Void> {
      * @param phoneNumber the phone number to authenticate
      */
     @SuppressWarnings("UnusedDeclaration")
-    public static void authenticate(AuthCallback callback, String phoneNumber) {
-        authenticate(callback, ThemeUtils.DEFAULT_THEME, phoneNumber, false);
+    public static void authenticate(Context activity, AuthCallback callback, String phoneNumber) {
+        authenticate(activity, callback, ThemeUtils.DEFAULT_THEME, phoneNumber, false);
     }
 
     /**
@@ -100,9 +101,9 @@ public class Digits extends Kit<Void> {
      * @param themeResId Theme resource id
      */
     @SuppressWarnings("UnusedDeclaration")
-    public static void authenticate(AuthCallback callback, int themeResId) {
+    public static void authenticate(Context activity, AuthCallback callback, int themeResId) {
         getInstance().setTheme(themeResId);
-        getInstance().getDigitsClient().startSignUp(callback);
+        getInstance().getDigitsClient().startSignUp(activity, callback);
     }
 
     /**
@@ -114,10 +115,10 @@ public class Digits extends Kit<Void> {
      * @param phoneNumber the phone number to authenticate
      */
     @SuppressWarnings("UnusedDeclaration")
-    public static void authenticate(AuthCallback callback, int themeResId, String phoneNumber,
+    public static void authenticate(Context activity, AuthCallback callback, int themeResId, String phoneNumber,
                                     boolean emailCollection) {
         getInstance().setTheme(themeResId);
-        getInstance().getDigitsClient().startSignUp(callback, phoneNumber, emailCollection);
+        getInstance().getDigitsClient().startSignUp(activity, callback, phoneNumber, emailCollection);
     }
 
     public static SessionManager<DigitsSession> getSessionManager() {

@@ -37,17 +37,21 @@ public class DigitsAuthButton extends Button implements View.OnClickListener {
     volatile DigitsClient digitsClient;
     private AuthCallback callback;
     private OnClickListener onClickListener;
+    private Context context;
 
     public DigitsAuthButton(Context context) {
         this(context, null);
+        this.context = context;
     }
 
     public DigitsAuthButton(Context context, AttributeSet attrs) {
         this(context, attrs, android.R.attr.buttonStyle);
+        this.context = context;
     }
 
     public DigitsAuthButton(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        this.context = context;
         setUpButton();
         super.setOnClickListener(this);
     }
@@ -72,7 +76,7 @@ public class DigitsAuthButton extends Button implements View.OnClickListener {
             throw new IllegalArgumentException("AuthCallback must not be null");
         }
 
-        getDigitsClient().startSignUp(callback);
+        getDigitsClient().startSignUp(context, callback);
         if (onClickListener != null) {
             onClickListener.onClick(v);
         }
